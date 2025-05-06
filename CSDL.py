@@ -11,6 +11,8 @@ import dlib
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")  # Đường dẫn đến file model
 
+def euclidean(p1, p2):
+    return np.linalg.norm(np.array(p1) - np.array(p2))
 # 🔹 Hàm trích xuất đặc trưng từ ảnh
 def extract_facial_features(image_path):
     image = cv2.imread(image_path)
@@ -21,26 +23,35 @@ def extract_facial_features(image_path):
         return None
 
     for face in faces:
-        landmarks = predictor(gray, face)
+        shape = predictor(gray, face)
+        landmarks = [(pt.x, pt.y) for pt in shape.parts()]
 
-        points = np.array([(landmarks.part(i).x, landmarks.part(i).y) for i in range(68)])
+        p36, p45 = landmarks[36], landmarks[45]
+        p48, p54 = landmarks[48], landmarks[54]
+        p31, p35 = landmarks[31], landmarks[35]
+        p3, p13 = landmarks[3], landmarks[13]
+        p8, p27 = landmarks[8], landmarks[27]
 
-        # Tính toán các đặc trưng
+        # Tính các khoảng cách
+        d_eye = euclidean(p36, p45)
+        d_mouth = euclidean(p48, p54)
+        d_nose = euclidean(p31, p35)
+        d_jaw = euclidean(p3, p13)
+        d_face_height = euclidean(p8, p27)
+
+        # Tránh chia cho 0
+        if d_face_height == 0 or d_mouth == 0:
+            return None
+
+        # Tính các đặc trưng
         features = [
-            np.linalg.norm(points[42] - points[39]),   # Khoảng cách hai mắt
-            np.linalg.norm(points[17] - points[21]),   # Chiều dài cung mày trái
-            np.linalg.norm(points[22] - points[26]),   # Chiều dài cung mày phải
-            np.linalg.norm(points[21] - points[22]),   # Khoảng cách giữa hai lông mày
-            np.linalg.norm(points[48] - points[54]),   # Chiều rộng miệng
-            np.linalg.norm(points[51] - points[57]),   # Chiều cao miệng
-            np.linalg.norm(points[37] - points[41]),   # Độ mở mắt trái
-            np.linalg.norm(points[43] - points[47]),   # Độ mở mắt phải
-            np.linalg.norm(points[27] - points[33]),   # Chiều dài sống mũi
-            np.linalg.norm(points[31] - points[35]),   # Chiều rộng mũi
-            np.linalg.norm(points[0] - points[16]) / np.linalg.norm(points[8] - points[27]),  # Tỉ lệ mặt
-            np.arctan2(points[8][1] - points[0][1], points[8][0] - points[0][0])  # Độ dốc hàm
+            d_eye / d_face_height,
+            d_mouth / d_face_height,
+            d_nose / d_face_height,
+            d_jaw / d_face_height,
         ]
-        return np.array(features)
+
+        return features
 
 # 🔹 Hàm tải dữ liệu từ MySQL
 def load_data():
@@ -48,13 +59,11 @@ def load_data():
         host="localhost",
         user="root",
         password="root",
-        database="face_img_db"
+        database="csdldpt"
     )
     cursor = conn.cursor()
 
-    cursor.execute("SELECT path, eye_distance, left_eyebrow_length, right_eyebrow_length, brow_distance, "
-                   "mouth_width, mouth_height, left_eye_opening, right_eye_opening, "
-                   "nose_length, nose_width, face_ratio, jaw_slope FROM face_features")
+    cursor.execute("SELECT image_path, d_eye_norm, d_mouth_norm, d_nose_norm, d_jaw_norm from face_features")
     
     rows = cursor.fetchall()
     paths = [row[0] for row in rows]
@@ -101,21 +110,34 @@ def choose_image():
 paths, data = load_data()
 kd_tree = KDTree(data)
 
-# 🔹 Giao diện Tkinter
+# giao diện
 root = tk.Tk()
 root.title("Tìm kiếm ảnh bằng KD-tree")
 
-btn_choose = tk.Button(root, text="Chọn ảnh", command=choose_image)
+btn_choose = tk.Button(root, text="Chọn ảnh", command=choose_image)  # Giả sử hàm choose_image đã định nghĩa
 btn_choose.pack(pady=10)
 
 input_image_label = tk.Label(root)
 input_image_label.pack(pady=5)
 
-result_labels = [tk.Label(root, text="", fg="blue"),tk.Label(root, text="", fg="blue"),tk.Label(root, text="", fg="blue")]
+# Tạo một frame để chứa các kết quả theo chiều ngang
+result_frame = tk.Frame(root)
+result_frame.pack(pady=10)
 
-result_image_labels = [tk.Label(root),tk.Label(root),tk.Label(root)]
-for i in range(0,3):
-    result_labels[i].pack(pady=i*6+5)
-    result_image_labels[i].pack(pady=i*6+5)
+result_labels = []
+result_image_labels = []
+
+for i in range(3):
+    item_frame = tk.Frame(result_frame)
+    item_frame.pack(side="left", padx=10)  # Các item nằm ngang
+
+    label = tk.Label(item_frame, text=f"Ảnh {i+1}", fg="blue")
+    label.pack()
+
+    img_label = tk.Label(item_frame)
+    img_label.pack()
+
+    result_labels.append(label)
+    result_image_labels.append(img_label)
 
 root.mainloop()
