@@ -1,12 +1,11 @@
 import mysql.connector
 import numpy as np
-from scipy.spatial import KDTree
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 import cv2
 import dlib
-
+import KDTree
 # 🔹 Khởi tạo detector & predictor của dlib
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")  # Đường dẫn đến file model
@@ -26,11 +25,13 @@ def extract_facial_features(image_path):
         shape = predictor(gray, face)
         landmarks = [(pt.x, pt.y) for pt in shape.parts()]
 
-        p36, p45 = landmarks[36], landmarks[45]
-        p48, p54 = landmarks[48], landmarks[54]
-        p31, p35 = landmarks[31], landmarks[35]
-        p3, p13 = landmarks[3], landmarks[13]
-        p8, p27 = landmarks[8], landmarks[27]
+        p36, p45 = landmarks[36], landmarks[45] # khoảng cách 2 mắt
+        p48, p54 = landmarks[48], landmarks[54] # độ dài miệng
+        p31, p35 = landmarks[31], landmarks[35] # chiều ngang mũi
+        p27, p33 = landmarks[27], landmarks[30] # độ dài sống mũi
+        p3, p13 = landmarks[3], landmarks[13] # độ rộng hàm
+        p17, p21 = landmarks[17], landmarks[21] # độ dài cung mày trái
+        p8, p27 = landmarks[8], landmarks[27] # chiều cao khuôn mặt
 
         # Tính các khoảng cách
         d_eye = euclidean(p36, p45)
@@ -75,17 +76,18 @@ def load_data():
 
 # 🔹 Hàm tìm ảnh gần nhất
 def find_nearest_image(query_point, k):
-    distances, indices  = kd_tree.query([query_point], k = k)
-
-    nearest_paths = [paths[i] for i in indices[0]]
+    results = KDTree.k_nearest(kd_tree, query_point, k)
 
     # Hiển thị ảnh gần nhất
-    for i in range(0,3):
-        img = Image.open(nearest_paths[i]).resize((200, 200))
+    i = 0
+    for dist, path, _ in results:
+        print(dist, path)
+        img = Image.open(path).resize((200, 200))
         img = ImageTk.PhotoImage(img)
         result_image_labels[i].config(image=img)
         result_image_labels[i].image = img
-        result_labels[i].config(text=f"Ảnh gần thứ {i+1}: {nearest_paths[i]}\nKhoảng cách: {distances[0][i]:.2f}")
+        result_labels[i].config(text=f"Ảnh gần thứ {i+1}: {path}\nKhoảng cách: {dist:.5f}")
+        i = i +1
 
 # 🔹 Hàm chọn ảnh từ máy tính
 def choose_image():
@@ -108,7 +110,14 @@ def choose_image():
 
 # 🔹 Tải dữ liệu MySQL và tạo KD-tree
 paths, data = load_data()
-kd_tree = KDTree(data)
+
+points = list(zip(paths, data))
+
+# print(data)
+# std_devs = np.std(data, axis=0)
+# print(std_devs)
+
+kd_tree = KDTree.build_kdtree(points)
 
 # giao diện
 root = tk.Tk()
