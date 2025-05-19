@@ -12,6 +12,15 @@ predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")  # Đ�
 
 def euclidean(p1, p2):
     return np.linalg.norm(np.array(p1) - np.array(p2))
+
+def normalize(data):
+    mean = data.mean(axis = 0)
+    std = data.std(axis = 0)
+
+    data_norm = (data - mean)/std
+    
+    return mean, std, data_norm
+
 # 🔹 Hàm trích xuất đặc trưng từ ảnh
 def extract_facial_features(image_path):
     image = cv2.imread(image_path)
@@ -52,7 +61,7 @@ def extract_facial_features(image_path):
             d_jaw / d_face_height,
         ]
 
-        return features
+    return features
 
 # 🔹 Hàm tải dữ liệu từ MySQL
 def load_data():
@@ -103,15 +112,21 @@ def choose_image():
 
     # Trích xuất đặc trưng & tìm ảnh gần nhất
     query_features = extract_facial_features(file_path)
+    query_features = (query_features - mean)/std
     if query_features is not None:
         find_nearest_image(query_features, 3)
     else:
         messagebox.showerror("Lỗi", "Không phát hiện khuôn mặt trong ảnh!")
 
+np.set_printoptions(precision=5, suppress=True)
+
 # 🔹 Tải dữ liệu MySQL và tạo KD-tree
 paths, data = load_data()
 
-points = list(zip(paths, data))
+
+mean, std, data_norm = normalize(data)
+
+points = list(zip(paths, data_norm))
 
 # print(data)
 # std_devs = np.std(data, axis=0)
@@ -119,9 +134,10 @@ points = list(zip(paths, data))
 
 kd_tree = KDTree.build_kdtree(points)
 
+
 # giao diện
 root = tk.Tk()
-root.title("Tìm kiếm ảnh bằng KD-tree")
+root.title("Tìm 3 ảnh gần nhất")
 
 btn_choose = tk.Button(root, text="Chọn ảnh", command=choose_image)  # Giả sử hàm choose_image đã định nghĩa
 btn_choose.pack(pady=10)

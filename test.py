@@ -3,7 +3,7 @@ import dlib
 
 # Đường dẫn tới file dự đoán landmark và ảnh khuôn mặt
 predictor_path = 'shape_predictor_68_face_landmarks.dat'
-image_path = 'anh1\\2.jpg'
+image_path = 'input/trinh.jpg'
 
 # Khởi tạo detector và predictor
 detector = dlib.get_frontal_face_detector()
@@ -26,6 +26,8 @@ for face in faces:
         # Ghi số thứ tự của điểm landmark
         cv2.putText(img, str(n), (x+3, y-3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
 
-cv2.imshow("Facial Landmarks with Index", img)
+resize_img = cv2.resize(img,(1000,1000))
+
+cv2.imshow("Facial Landmarks with Index", resize_img)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
